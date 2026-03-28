@@ -8,7 +8,14 @@ public class pixelate_project : ModuleRules
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 	
-		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore" });
+		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore",
+        "EnhancedInput",
+            "UMG",
+            "Slate",
+            "SlateCore",
+            "AIModule",
+            "GameplayTasks",
+            "NavigationSystem"});
 
 		PrivateDependencyModuleNames.AddRange(new string[] {  });
 
