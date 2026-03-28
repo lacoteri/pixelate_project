@@ -47,5 +47,57 @@ public:
 	UFUNCTION()
 	void OnAttackMontageEnded(UAnimMontage* Montage, bool bInterrupted);
 
+	// 공격 판정 중인지
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat|Hit")
+	bool bAttackTraceActive = false;
 
+	// 트레이스 시작 소켓 이름
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Hit")
+	FName AttackTraceStartSocket = TEXT("WeaponRoot");
+
+	// 트레이스 끝 소켓 이름
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Hit")
+	FName AttackTraceEndSocket = TEXT("WeaponTip");
+
+	// 트레이스 반지름
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Hit")
+	float AttackTraceRadius = 20.f;
+
+	// 공격 데미지
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Hit")
+	float AttackDamage = 10.f;
+
+	UFUNCTION(BlueprintCallable, Category = "Combat|Hit")
+	void StartAttackTrace();
+
+	UFUNCTION(BlueprintCallable, Category = "Combat|Hit")
+	void EndAttackTrace();
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Parry")
+	UAnimMontage* ParriedMontage = nullptr;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat|Parry")
+	bool bIsParried = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Parry")
+	float ParryStunDuration = 0.8f;
+
+	UFUNCTION(BlueprintCallable, Category = "Combat|Parry")
+	void HandleParried();
+
+	UFUNCTION()
+	void OnParriedMontageEnded(UAnimMontage* Montage, bool bInterrupted);
+
+	UFUNCTION(BlueprintCallable, Category = "Combat|Parry")
+	bool TryCallPlayerParry(AActor* HitActor);
+
+protected:
+
+	void PerformAttackTrace();
+
+	// 한 공격에서 중복 타격 방지
+	UPROPERTY()
+	TArray<AActor*> HitActorsThisSwing;
+
+	FTimerHandle ParryRecoverTimerHandle;
 };

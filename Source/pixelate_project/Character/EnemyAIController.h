@@ -17,8 +17,10 @@ class PIXELATE_PROJECT_API AEnemyAIController : public AAIController
 {
 	GENERATED_BODY()
 public:
-
+	UFUNCTION(BlueprintCallable)
 	void PauseAI();
+
+	UFUNCTION(BlueprintCallable)
 	void ResumeAI();
 protected:
 	virtual void BeginPlay() override;

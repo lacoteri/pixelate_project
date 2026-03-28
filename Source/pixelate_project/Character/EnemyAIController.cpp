@@ -29,10 +29,18 @@ void AEnemyAIController::OnPossess(APawn* InPawn)
 
 void AEnemyAIController::PauseAI()
 {
-
+	if (BrainComponent)
+	{
+		BrainComponent->StopLogic(TEXT("Parried"));
+	}
 }
 
 void AEnemyAIController::ResumeAI()
 {
-
+	AEnemyCharacter* Enemy = Cast<AEnemyCharacter>(GetPawn());
+	if (Enemy && Enemy->BehaviorTreeAsset)
+	{
+		RunBehaviorTree(Enemy->BehaviorTreeAsset);
+		CachedBehaviorTree = Cast<UBehaviorTreeComponent>(BrainComponent);
+	}
 }
