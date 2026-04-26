@@ -6,6 +6,27 @@
 #include "GameFramework/Character.h"
 #include "EnemyCharacter.generated.h"
 
+class UHPBar;
+
+USTRUCT(BlueprintType)
+struct FEnemyStats
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stats")
+	int32 MaxHP = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stats")
+	int32 CurrentHP = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stats")
+	int32 AttackPower = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stats")
+	int32 Defense = 0;
+};
+
+
 UCLASS()
 class PIXELATE_PROJECT_API AEnemyCharacter : public ACharacter
 {
@@ -91,7 +112,27 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Combat|Parry")
 	bool TryCallPlayerParry(AActor* HitActor);
 
+	UPROPERTY(BlueprintReadOnly, Category = "State")
+	bool bIsDead;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Enemy Stats")
+	FEnemyStats EnemyStats;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "UI")
+	UHPBar* HPBarWidget;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "UI")
+	TSubclassOf<UHPBar> HPBarWidgetClass;
+
+	UFUNCTION(BlueprintCallable)
+	void TakeDamage(float damage);
+
+	UPROPERTY(EditAnywhere, Category = "UI|HPBar")
+	float HPBarVisibleDistance = 1000.f;
+
+
 protected:
+	FTimerHandle HideHPBarTimerHandle;
 
 	void PerformAttackTrace();
 

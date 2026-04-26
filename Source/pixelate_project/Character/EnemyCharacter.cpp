@@ -3,6 +3,7 @@
 
 #include "pixelate_project/Character/EnemyCharacter.h"
 #include "pixelate_project/Character/EnemyAIController.h"
+#include "pixelate_project/UI/HPBar.h"
 
 #include "Animation/AnimInstance.h"
 #include "BehaviorTree/BlackboardComponent.h"
@@ -27,16 +28,66 @@ AEnemyCharacter::AEnemyCharacter()
 void AEnemyCharacter::BeginPlay()
 {
 	Super::BeginPlay();
-	
+
+	if (APlayerController* PC = UGameplayStatics::GetPlayerController(GetWorld(), 0))
+	{
+		if (HPBarWidgetClass)
+		{
+			HPBarWidget = CreateWidget<UHPBar>(PC, HPBarWidgetClass);
+			if (HPBarWidget)
+			{
+				HPBarWidget->AddToViewport(9999);
+				HPBarWidget->SetVisibility(ESlateVisibility::Collapsed); // 처음엔 안 보이게
+			}
+		}
+	}
 }
 
 // Called every frame
 void AEnemyCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+
+	if (!HPBarWidget || bIsDead)
+	{
+		return;
+	}
+
+
 	if (bAttackTraceActive && !bIsParried)
 	{
 		PerformAttackTrace();
+	}
+
+	APlayerController* PC = UGameplayStatics::GetPlayerController(GetWorld(), 0);
+	if (!PC)
+	{
+		return;
+	}
+
+	APawn* PlayerPawn = PC->GetPawn();
+	if (!PlayerPawn)
+	{
+		return;
+	}
+
+	//const float Distance = FVector::Dist(PlayerPawn->GetActorLocation(), GetActorLocation());
+
+	//if (Distance > HPBarVisibleDistance)
+	//{
+	//	if (HPBarWidget->GetVisibility() != ESlateVisibility::Collapsed)
+	//	{
+	//		HPBarWidget->SetVisibility(ESlateVisibility::Collapsed);
+	//	}
+	//	return;
+	//}
+
+	FVector WorldLocation = GetActorLocation() + FVector(0, 0, 120.f);
+	FVector2D ScreenPosition;
+
+	if (PC->ProjectWorldLocationToScreen(WorldLocation, ScreenPosition))
+	{
+		HPBarWidget->SetPositionInViewport(ScreenPosition);
 	}
 }
 
@@ -199,31 +250,9 @@ void AEnemyCharacter::PerformAttackTrace()
 		{
 			continue;
 		}
-
-		if (GEngine)
-		{
-			GEngine->AddOnScreenDebugMessage(
-				-1,
-				2.f,
-				FColor::Cyan,
-				FString::Printf(TEXT("Hit Candidate: %s"), *HitActor->GetName())
-			);
-		}
-
 		if (HitActor->ActorHasTag(TEXT("Player")))
 		{
 			PlayerActor = HitActor;
-
-			if (GEngine)
-			{
-				GEngine->AddOnScreenDebugMessage(
-					-1,
-					2.f,
-					FColor::Green,
-					TEXT("Player Tag Found")
-				);
-			}
-
 			break;
 		}
 	}
@@ -253,6 +282,8 @@ void AEnemyCharacter::PerformAttackTrace()
 			return;
 		}
 
+		UE_LOG(LogTemp, Error, TEXT("ApplyDamage To Player / Damage: %f"), AttackDamage);
+
 		UGameplayStatics::ApplyDamage(
 			PlayerActor,
 			AttackDamage,
@@ -266,10 +297,6 @@ void AEnemyCharacter::PerformAttackTrace()
 
 	if (!PlayerActor)
 	{
-		if (GEngine)
-		{
-			GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Red, TEXT("PLAYER NOT FOUND IN HIT RESULTS"));
-		}
 		return;
 	}
 }
@@ -302,4 +329,80 @@ bool AEnemyCharacter::TryCallPlayerParry(AActor* HitActor)
 	HitActor->ProcessEvent(Func, &Params);
 
 	return Params.bParrySucceeded;
+}
+
+void AEnemyCharacter::TakeDamage(float damage)
+{
+	int32 Defense = EnemyStats.Defense;
+
+	float DamageMultiplier = 100.f / (100.f + static_cast<float>(Defense));
+	float FinalDamage = damage * DamageMultiplier;
+
+	EnemyStats.CurrentHP -= FinalDamage;
+
+
+	if (EnemyStats.CurrentHP <= 0)
+	{
+		if (UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance())
+		{
+			AnimInstance->StopAllMontages(0.1f);
+		}
+
+
+		if (AEnemyAIController* AIController = Cast<AEnemyAIController>(GetController()))
+		{
+			AIController->PauseAI();
+		}
+
+		// 사망 처리
+		EnemyStats.CurrentHP = 0;
+		bIsDead = true;
+
+		if (HPBarWidget)
+		{
+			GetWorld()->GetTimerManager().ClearTimer(HideHPBarTimerHandle);
+			HPBarWidget->RemoveFromParent();
+			HPBarWidget = nullptr;
+		}
+
+		AAIController* AIController = Cast<AAIController>(GetController());
+		if (AIController)
+		{
+			AIController->StopMovement();
+			AIController->UnPossess();
+		}
+
+		USkeletalMeshComponent* MeshComponent = GetMesh();
+		MeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		MeshComponent->SetCollisionResponseToAllChannels(ECR_Ignore);
+
+		UE_LOG(LogTemp, Error, TEXT("Monster Dead"));
+
+		return;
+	}
+
+	if (HPBarWidget)
+	{
+		float Percent = static_cast<float>(EnemyStats.CurrentHP) / static_cast<float>(EnemyStats.MaxHP);
+		HPBarWidget->SetHPBarPercent(Percent);
+
+		HPBarWidget->SetVisibility(ESlateVisibility::Visible);
+		HPBarWidget->SetRenderOpacity(1.0f);
+		HPBarWidget->SetDesiredSizeInViewport(FVector2D(200.f, 30.f));
+		HPBarWidget->SetPositionInViewport(FVector2D(500.f, 300.f), false);
+
+		GetWorld()->GetTimerManager().ClearTimer(HideHPBarTimerHandle);
+		GetWorld()->GetTimerManager().SetTimer(
+			HideHPBarTimerHandle,
+			[this]()
+			{
+				if (HPBarWidget && !bIsDead)
+				{
+					HPBarWidget->SetVisibility(ESlateVisibility::Hidden);
+				}
+			},
+			1.0f,
+			false
+		);
+	}
 }
