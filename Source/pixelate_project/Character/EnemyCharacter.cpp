@@ -1,6 +1,5 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
-
 #include "pixelate_project/Character/EnemyCharacter.h"
 #include "pixelate_project/Character/EnemyAIController.h"
 #include "pixelate_project/UI/HPBar.h"
@@ -8,40 +7,35 @@
 #include "Animation/AnimInstance.h"
 #include "BehaviorTree/BlackboardComponent.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Components/WidgetComponent.h" // 위젯 컴포넌트 헤더 추가됨
 #include "DrawDebugHelpers.h"
 #include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
 #include "TimerManager.h"
 
-
 // Sets default values
 AEnemyCharacter::AEnemyCharacter()
 {
- 	// Set this character to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
+	// Set this character to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
 
 	AutoPossessAI = EAutoPossessAI::PlacedInWorldOrSpawned;
 	AIControllerClass = AEnemyAIController::StaticClass();
+
+	// --- [수정됨] 체력바 컴포넌트를 몬스터 몸에 부착합니다 ---
+	HPBarComponent = CreateDefaultSubobject<UWidgetComponent>(TEXT("HPBarComponent"));
+	HPBarComponent->SetupAttachment(RootComponent);
+	HPBarComponent->SetWidgetSpace(EWidgetSpace::Screen); // 항상 화면을 바라보게 설정
+	HPBarComponent->SetDrawSize(FVector2D(150.f, 20.f));  // 기본 크기
+	HPBarComponent->SetRelativeLocation(FVector(0.0f, 0.0f, 250.f)); // 머리 위 높이
+	HPBarComponent->SetVisibility(false); // 처음에는 숨김 처리
 }
 
 // Called when the game starts or when spawned
 void AEnemyCharacter::BeginPlay()
 {
 	Super::BeginPlay();
-
-	if (APlayerController* PC = UGameplayStatics::GetPlayerController(GetWorld(), 0))
-	{
-		if (HPBarWidgetClass)
-		{
-			HPBarWidget = CreateWidget<UHPBar>(PC, HPBarWidgetClass);
-			if (HPBarWidget)
-			{
-				HPBarWidget->AddToViewport(9999);
-				HPBarWidget->SetAlignmentInViewport(FVector2D(0.5f, 0.5f));
-				HPBarWidget->SetVisibility(ESlateVisibility::Collapsed); // 처음엔 안 보이게
-			}
-		}
-	}
+	// 기존 뷰포트에 UI를 띄우는 코드는 삭제되었습니다. (컴포넌트가 알아서 처리함)
 }
 
 // Called every frame
@@ -49,54 +43,23 @@ void AEnemyCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	if (!HPBarWidget || bIsDead)
+	if (bIsDead)
 	{
 		return;
 	}
-
 
 	if (bAttackTraceActive && !bIsParried)
 	{
 		PerformAttackTrace();
 	}
 
-	APlayerController* PC = UGameplayStatics::GetPlayerController(GetWorld(), 0);
-	if (!PC)
-	{
-		return;
-	}
-
-	APawn* PlayerPawn = PC->GetPawn();
-	if (!PlayerPawn)
-	{
-		return;
-	}
-
-	const float Distance = FVector::Dist(PlayerPawn->GetActorLocation(), GetActorLocation());
-
-	if (Distance > HPBarVisibleDistance)
-	{
-		if (HPBarWidget->GetVisibility() != ESlateVisibility::Collapsed)
-		{
-			HPBarWidget->SetVisibility(ESlateVisibility::Collapsed);
-		}
-		return;
-	}
-
-	FVector WorldLocation = GetActorLocation() + FVector(0.0f, 0, 250.f);
-	FVector2D ScreenPosition;
-
-	if (PC->ProjectWorldLocationToScreen(WorldLocation, ScreenPosition))
-	{
-		HPBarWidget->SetPositionInViewport(ScreenPosition);
-	}
+	// 기존의 화면 좌표를 계산해서 UI를 옮기는 코드는 삭제되었습니다.
 }
 
 // Called to bind functionality to input
 void AEnemyCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
-
 }
 
 void AEnemyCharacter::PlayAttackMontageByIndex(int32 Index)
@@ -137,7 +100,6 @@ void AEnemyCharacter::OnAttackMontageEnded(UAnimMontage* Montage, bool bInterrup
 		float Rand = FMath::FRandRange(0.f, 100.f);
 		if (Rand <= RetreatChancePercent)
 		{
-
 			if (AEnemyAIController* AIController = Cast<AEnemyAIController>(GetController()))
 			{
 				AIController->GetBlackboardComponent()->SetValueAsBool("ShouldChaseAfterRetreat", true);
@@ -163,14 +125,9 @@ void AEnemyCharacter::HandleParried()
 	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
 
 	bIsParried = true;
-
-
 	AnimInstance->StopAllMontages(0.1f);
-
-
 	CurrentAttackStep = 0;
 	bHasRetreatedThisCombo = false;
-
 
 	if (AEnemyAIController* AIController = Cast<AEnemyAIController>(GetController()))
 	{
@@ -242,7 +199,6 @@ void AEnemyCharacter::PerformAttackTrace()
 		return;
 	}
 
-	//GEngine->AddOnScreenDebugMessage(-1, 1.0f, FColor::Red, TEXT("HIT DETECTED"));
 	AActor* PlayerActor = nullptr;
 	for (const FHitResult& Hit : HitResults)
 	{
@@ -266,7 +222,6 @@ void AEnemyCharacter::PerformAttackTrace()
 		}
 
 		HitActorsThisSwing.Add(PlayerActor);
-
 		GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Green, TEXT("PLAYER HIT"));
 
 		const bool bParrySucceeded = TryCallPlayerParry(PlayerActor);
@@ -293,11 +248,6 @@ void AEnemyCharacter::PerformAttackTrace()
 			UDamageType::StaticClass()
 		);
 
-		return;
-	}
-
-	if (!PlayerActor)
-	{
 		return;
 	}
 }
@@ -341,14 +291,12 @@ void AEnemyCharacter::TakeDamage(float damage)
 
 	EnemyStats.CurrentHP -= FinalDamage;
 
-
 	if (EnemyStats.CurrentHP <= 0)
 	{
 		if (UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance())
 		{
 			AnimInstance->StopAllMontages(0.1f);
 		}
-
 
 		if (AEnemyAIController* AIController = Cast<AEnemyAIController>(GetController()))
 		{
@@ -359,11 +307,11 @@ void AEnemyCharacter::TakeDamage(float damage)
 		EnemyStats.CurrentHP = 0;
 		bIsDead = true;
 
-		if (HPBarWidget)
+		// --- [수정됨] 사망 시 체력바 숨기기 ---
+		if (HPBarComponent)
 		{
 			GetWorld()->GetTimerManager().ClearTimer(HideHPBarTimerHandle);
-			HPBarWidget->RemoveFromParent();
-			HPBarWidget = nullptr;
+			HPBarComponent->SetVisibility(false);
 		}
 
 		AAIController* AIController = Cast<AAIController>(GetController());
@@ -382,26 +330,32 @@ void AEnemyCharacter::TakeDamage(float damage)
 		return;
 	}
 
-	if (HPBarWidget)
+	// --- [수정됨] 데미지를 입었을 때 체력바 업데이트 로직 ---
+	if (HPBarComponent)
 	{
-		float Percent = static_cast<float>(EnemyStats.CurrentHP) / static_cast<float>(EnemyStats.MaxHP);
-		HPBarWidget->SetHPBarPercent(Percent);
+		// 컴포넌트 안에서 실제 UI를 꺼내옵니다.
+		UHPBar* HPWidget = Cast<UHPBar>(HPBarComponent->GetUserWidgetObject());
+		if (HPWidget)
+		{
+			float Percent = static_cast<float>(EnemyStats.CurrentHP) / static_cast<float>(EnemyStats.MaxHP);
+			HPWidget->SetHPBarPercent(Percent);
 
-		HPBarWidget->SetVisibility(ESlateVisibility::Visible);
+			HPBarComponent->SetVisibility(true); // 체력바 보이게 켜기
 
-
-		GetWorld()->GetTimerManager().ClearTimer(HideHPBarTimerHandle);
-		GetWorld()->GetTimerManager().SetTimer(
-			HideHPBarTimerHandle,
-			[this]()
-			{
-				if (HPBarWidget && !bIsDead)
+			// 1초 뒤에 체력바 숨기기
+			GetWorld()->GetTimerManager().ClearTimer(HideHPBarTimerHandle);
+			GetWorld()->GetTimerManager().SetTimer(
+				HideHPBarTimerHandle,
+				[this]()
 				{
-					HPBarWidget->SetVisibility(ESlateVisibility::Hidden);
-				}
-			},
-			1.0f,
-			false
-		);
+					if (HPBarComponent && !bIsDead)
+					{
+						HPBarComponent->SetVisibility(false);
+					}
+				},
+				1.0f,
+				false
+			);
+		}
 	}
 }

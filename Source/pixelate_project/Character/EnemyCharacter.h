@@ -141,4 +141,9 @@ protected:
 	TArray<AActor*> HitActorsThisSwing;
 
 	FTimerHandle ParryRecoverTimerHandle;
+
+public:
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UI")
+	class UWidgetComponent* HPBarComponent;
+
 };
