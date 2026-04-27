@@ -37,6 +37,7 @@ void AEnemyCharacter::BeginPlay()
 			if (HPBarWidget)
 			{
 				HPBarWidget->AddToViewport(9999);
+				HPBarWidget->SetAlignmentInViewport(FVector2D(0.5f, 0.5f));
 				HPBarWidget->SetVisibility(ESlateVisibility::Collapsed); // 처음엔 안 보이게
 			}
 		}
@@ -71,18 +72,18 @@ void AEnemyCharacter::Tick(float DeltaTime)
 		return;
 	}
 
-	//const float Distance = FVector::Dist(PlayerPawn->GetActorLocation(), GetActorLocation());
+	const float Distance = FVector::Dist(PlayerPawn->GetActorLocation(), GetActorLocation());
 
-	//if (Distance > HPBarVisibleDistance)
-	//{
-	//	if (HPBarWidget->GetVisibility() != ESlateVisibility::Collapsed)
-	//	{
-	//		HPBarWidget->SetVisibility(ESlateVisibility::Collapsed);
-	//	}
-	//	return;
-	//}
+	if (Distance > HPBarVisibleDistance)
+	{
+		if (HPBarWidget->GetVisibility() != ESlateVisibility::Collapsed)
+		{
+			HPBarWidget->SetVisibility(ESlateVisibility::Collapsed);
+		}
+		return;
+	}
 
-	FVector WorldLocation = GetActorLocation() + FVector(0, 0, 120.f);
+	FVector WorldLocation = GetActorLocation() + FVector(0.0f, 0, 250.f);
 	FVector2D ScreenPosition;
 
 	if (PC->ProjectWorldLocationToScreen(WorldLocation, ScreenPosition))
@@ -387,9 +388,7 @@ void AEnemyCharacter::TakeDamage(float damage)
 		HPBarWidget->SetHPBarPercent(Percent);
 
 		HPBarWidget->SetVisibility(ESlateVisibility::Visible);
-		HPBarWidget->SetRenderOpacity(1.0f);
-		HPBarWidget->SetDesiredSizeInViewport(FVector2D(200.f, 30.f));
-		HPBarWidget->SetPositionInViewport(FVector2D(500.f, 300.f), false);
+
 
 		GetWorld()->GetTimerManager().ClearTimer(HideHPBarTimerHandle);
 		GetWorld()->GetTimerManager().SetTimer(
